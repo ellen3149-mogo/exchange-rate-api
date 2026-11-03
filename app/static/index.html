@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>匯率換算</title>
+  <meta name="description" content="即時匯率查詢與幣別換算">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <main class="page">
+    <header class="masthead">
+      <h1>匯率換算</h1>
+      <p class="updated" id="updated" aria-live="polite">正在取得最新匯率…</p>
+    </header>
+
+    <section class="converter" aria-labelledby="converter-title">
+      <h2 id="converter-title" class="visually-hidden">幣別換算</h2>
+
+      <div class="equation">
+        <div class="side">
+          <label for="amount">金額</label>
+          <input id="amount" type="text" inputmode="decimal" autocomplete="off" value="100">
+          <label for="from" class="visually-hidden">從幣別</label>
+          <select id="from"></select>
+        </div>
+
+        <button type="button" id="swap" class="swap" aria-label="交換幣別">⇄</button>
+
+        <div class="side">
+          <span class="label" aria-hidden="true">換算結果</span>
+          <output id="result" for="amount from to" aria-live="polite">—</output>
+          <label for="to" class="visually-hidden">到幣別</label>
+          <select id="to"></select>
+        </div>
+      </div>
+
+      <p class="rate-line" id="rate-line"></p>
+      <p class="message" id="message" role="alert" hidden></p>
+    </section>
+
+    <section class="board" aria-labelledby="board-title">
+      <div class="board-head">
+        <h2 id="board-title">常用幣別牌告</h2>
+        <p>1 單位外幣可兌換的新台幣，點選一列即可帶入換算</p>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">幣別</th>
+            <th scope="col" class="num">新台幣</th>
+          </tr>
+        </thead>
+        <tbody id="board-body">
+          <tr><td colspan="2" class="empty">載入中…</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <footer class="footer">
+      <p>匯率資料來源：<a href="https://www.exchangerate-api.com" target="_blank" rel="noopener">Rates By Exchange Rate API</a>。資料每日更新一次，僅供參考，實際交易請以銀行牌告為準。</p>
+      <p><a href="/docs">API 文件（Swagger）</a></p>
+    </footer>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>
