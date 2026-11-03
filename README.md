@@ -44,8 +44,8 @@
 - **統一錯誤格式**：所有錯誤都附帶 `request_id`，方便追查。
 - **快取**：減少外部 API 呼叫，提升回應速度。
 - **重試與降級**：外部 API 暫時失敗時會自動重試；若有舊資料則回傳並標示 `stale`。
+- **網頁前端**：開啟服務網址即可使用換算器與常用幣別牌告，支援手機版面與深色模式。
 - **健康檢查與結構化日誌**：`/health` 供 Cloud Run 探測服務狀態，JSON 日誌會整合進 Cloud Logging。
-- - **網頁前端**：開啟服務網址即可使用換算器與常用幣別牌告，支援手機版面與深色模式。
 
 ---
 
@@ -234,9 +234,10 @@ exchange-rate-api/
 │   ├── logging_config.py     # Cloud Logging 相容的 JSON 日誌
 │   ├── routers/
 │   │   └── rates.py          # /api/v1/rates/latest、/api/v1/convert
-│   └── services/
-│       ├── rate_client.py    # 第三方 API 用戶端（快取、重試、降級）
-│       └── converter.py      # 換算邏輯（純函式）
+│   ├── services/
+│   │   ├── rate_client.py    # 第三方 API 用戶端（快取、重試、降級）
+│   │   └── converter.py      # 換算邏輯（純函式）
+│   └── static/               # 網頁前端（HTML / CSS / JavaScript）
 ├── tests/
 │   ├── conftest.py           # 以 MockTransport 模擬第三方 API
 │   ├── test_api.py           # API 測試
@@ -262,26 +263,64 @@ exchange-rate-api/
 
 ## 6. 本機開發與測試
 
-```bash
-# 建立虛擬環境並安裝套件
-python -m venv .venv && source .venv/bin/activate   # Windows：.venv\Scripts\activate
-pip install -r requirements-dev.txt
+### 方法一：使用 Docker（最簡單）
 
-# 啟動服務：前端 http://localhost:8080，API 文件 http://localhost:8080/docs
-
-# 執行測試與程式碼檢查
-pytest --cov=app
-ruff check . && ruff format --check .
-```
-
-使用 Docker：
+電腦已安裝 Docker 的話，只需兩行指令，不必安裝 Python：
 
 ```bash
-docker build -t exchange-rate-api .
+docker build -t exchange-rate-api https://github.com/ellen3149-mogo/exchange-rate-api.git
 docker run -p 8080:8080 exchange-rate-api
 ```
 
-測試透過 `httpx.MockTransport` 模擬第三方 API，**不需要網路**。也能模擬正常回應、服務中斷、格式錯誤與不支援的幣別等情境。
+啟動後以瀏覽器開啟 http://localhost:8080 。
+
+### 方法二：使用 Python
+
+需要 Python 3.12 以上與 Git。
+
+**1. 下載專案並建立虛擬環境**
+
+```bash
+git clone https://github.com/ellen3149-mogo/exchange-rate-api.git
+cd exchange-rate-api
+python -m venv .venv
+```
+
+**2. 啟用虛擬環境**
+
+```bash
+# Windows（PowerShell）
+.venv\Scripts\Activate.ps1
+
+# macOS / Linux
+source .venv/bin/activate
+```
+
+**3. 安裝套件並啟動服務**
+
+```bash
+pip install -r requirements-dev.txt
+uvicorn app.main:app --port 8080
+```
+
+啟動後以瀏覽器開啟：
+
+| 網址 | 內容 |
+|---|---|
+| http://localhost:8080 | 前端：匯率換算網頁 |
+| http://localhost:8080/docs | API 文件（Swagger UI） |
+
+停止服務請按 `Ctrl + C`。
+
+**4. 執行測試與程式碼檢查**
+
+```bash
+pytest --cov=app
+ruff check .
+ruff format --check .
+```
+
+測試透過 `httpx.MockTransport` 模擬第三方 API，**不需要網路**。也能模擬正常回應、服務中斷、格式錯誤與不支援的幣別等情境。實際使用前端或 API 時，則需要網路連線以取得真實匯率。
 
 ---
 
@@ -354,6 +393,8 @@ flowchart LR
 
 本專案採用 **GitHub Flow**：`main` 永遠保持可部署狀態，所有變更都透過 feature 分支與 Pull Request 合併。這個流程適合「合併即部署」的持續交付模式，也比 Git Flow 輕量。
 
+下圖為分支流程示意，實際的 PR 紀錄請見本 repo 的 [Pull requests](https://github.com/ellen3149-mogo/exchange-rate-api/pulls?q=is%3Apr) 頁面。
+
 ```mermaid
 gitGraph
     commit id: "init: project skeleton"
@@ -396,7 +437,7 @@ flowchart LR
 
 - **分支命名**：`feature/*`、`fix/*`、`hotfix/*`、`docs/*`
 - **Commit 訊息**：遵循 [Conventional Commits](https://www.conventionalcommits.org/)，例如 `feat:`、`fix:`、`test:`、`docs:`、`refactor:`
-- **main 分支保護**：禁止直接 push；合併前必須通過 CI 並取得至少 1 個 approve
+- **main 分支保護**：禁止直接 push，合併前必須通過 CI（多人協作時再加上至少 1 位 Reviewer 審核）
 - **合併方式**：Squash merge，讓 main 的歷史紀錄保持清楚
 - **版本標記**：以 `vMAJOR.MINOR.PATCH` 標記發佈版本
 
