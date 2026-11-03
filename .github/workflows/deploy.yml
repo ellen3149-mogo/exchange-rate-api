@@ -1,0 +1,125 @@
+name: CI/CD
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# 同一分支只保留最新一次執行，避免舊版本覆蓋新版本
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  REGION: asia-east1
+  SERVICE: exchange-rate-api
+
+jobs:
+  # ---------- CI：每個 PR 與 main 都會執行 ----------
+  test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint (ruff)
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Test with coverage
+        run: pytest --cov=app --cov-report=term-missing --cov-fail-under=85
+
+  terraform:
+    name: Terraform Validate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false
+      - run: terraform validate
+
+  docker-build:
+    name: Docker Build Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image (no push)
+        run: docker build -t ${{ env.SERVICE }}:pr-${{ github.event.number }} .
+
+  # ---------- CD：只有合併進 main 才部署 ----------
+  deploy:
+    name: Build & Deploy to Cloud Run
+    needs: [test, terraform]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.GCP_PROJECT_ID != ''
+    runs-on: ubuntu-latest
+    environment: production # 可在 GitHub 設定需要人工核准
+    permissions:
+      contents: read
+      id-token: write # Workload Identity Federation 需要 OIDC token
+    env:
+      IMAGE: asia-east1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/exchange-rate-api/exchange-rate-api:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud (keyless)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build & push image
+        run: |
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+
+      - name: Deploy to Cloud Run
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE }}
+          region: ${{ env.REGION }}
+          image: ${{ env.IMAGE }}
+          env_vars: |
+            APP_VERSION=${{ github.sha }}
+
+      - name: Smoke test
+        run: |
+          URL="${{ steps.deploy.outputs.url }}"
+          for i in 1 2 3 4 5; do
+            if curl -fsS "$URL/health"; then echo; echo "Deploy OK: $URL"; exit 0; fi
+            sleep 5
+          done
+          echo "Health check failed"; exit 1
+
+      - name: Rollback on failure
+        if: failure() && steps.deploy.outcome == 'success'
+        run: |
+          PREV=$(gcloud run revisions list --service "$SERVICE" --region "$REGION" \
+            --sort-by=~metadata.creationTimestamp --format='value(metadata.name)' | sed -n 2p)
+          echo "Rolling back to $PREV"
+          gcloud run services update-traffic "$SERVICE" --region "$REGION" --to-revisions "$PREV=100"
