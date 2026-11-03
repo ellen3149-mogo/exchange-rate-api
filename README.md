@@ -9,7 +9,7 @@
 | 第三方 API | [ExchangeRate-API 開放端點](https://www.exchangerate-api.com/docs/free)（open.er-api.com） |
 | IaC | Terraform（Google provider v6） |
 | CI/CD | GitHub Actions + Workload Identity Federation（免金鑰部署） |
-| 測試 | pytest，16 個測試案例，覆蓋率約 97% |
+| 測試 | pytest，19 個測試案例，覆蓋率約 97% |
 
 > 匯率資料來源：[Rates By Exchange Rate API](https://www.exchangerate-api.com)
 
@@ -45,6 +45,7 @@
 - **快取**：減少外部 API 呼叫，提升回應速度。
 - **重試與降級**：外部 API 暫時失敗時會自動重試；若有舊資料則回傳並標示 `stale`。
 - **健康檢查與結構化日誌**：`/health` 供 Cloud Run 探測服務狀態，JSON 日誌會整合進 Cloud Logging。
+- - **網頁前端**：開啟服務網址即可使用換算器與常用幣別牌告，支援手機版面與深色模式。
 
 ---
 
@@ -238,7 +239,8 @@ exchange-rate-api/
 │       └── converter.py      # 換算邏輯（純函式）
 ├── tests/
 │   ├── conftest.py           # 以 MockTransport 模擬第三方 API
-│   └── test_api.py           # 16 個測試案例
+│   ├── test_api.py           # API 測試
+│   └── test_frontend.py      # 前端頁面測試
 ├── terraform/
 │   ├── main.tf               # Cloud Run、Artifact Registry、IAM、WIF
 │   ├── variables.tf
@@ -265,8 +267,7 @@ exchange-rate-api/
 python -m venv .venv && source .venv/bin/activate   # Windows：.venv\Scripts\activate
 pip install -r requirements-dev.txt
 
-# 啟動服務（http://localhost:8080/docs）
-uvicorn app.main:app --reload --port 8080
+# 啟動服務：前端 http://localhost:8080，API 文件 http://localhost:8080/docs
 
 # 執行測試與程式碼檢查
 pytest --cov=app
