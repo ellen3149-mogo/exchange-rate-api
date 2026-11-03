@@ -8,11 +8,13 @@ import logging
 import time
 import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.config import Settings, get_settings
 from app.exceptions import register_exception_handlers
@@ -22,6 +24,7 @@ from app.schemas import HealthResponse
 from app.services.rate_client import RateClient
 
 logger = logging.getLogger("app.access")
+STATIC_DIR = Path(__file__).parent / "static"
 
 
 def create_app(
@@ -84,9 +87,12 @@ def create_app(
     register_exception_handlers(app)
     app.include_router(rates.router)
 
+    # 前端：由同一個服務提供靜態網頁，與 API 同源，不需要另外部署或設定 CORS
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
     @app.get("/", include_in_schema=False)
-    async def root():
-        return RedirectResponse(url="/docs")
+    async def index():
+        return FileResponse(STATIC_DIR / "index.html")
 
     @app.get("/health", response_model=HealthResponse, tags=["system"], summary="健康檢查")
     async def health():
