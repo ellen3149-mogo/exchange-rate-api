@@ -11,6 +11,8 @@
 | CI/CD | GitHub Actions + Workload Identity Federation（免金鑰部署） |
 | 測試 | pytest，16 個測試案例，覆蓋率約 97% |
 
+> 匯率資料來源：[Rates By Exchange Rate API](https://www.exchangerate-api.com)
+
 ---
 
 ## 目錄
